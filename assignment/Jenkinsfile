@@ -1,0 +1,38 @@
+pipeline{
+    agent any
+    environment{
+        PATH = "/usr/share/maven/bin:$PATH"
+    }
+    stages{
+        stage('scmpull'){
+            steps{
+                git credentialsId: 'github', url: 'https://github.com/modelrepo/assignmentrepo.git'
+            }
+        }
+        stage('build'){
+            steps{
+                sh 'mvn -f assignment/pom.xml clean install'
+            }
+        }
+        stage('SonarQube analysis') {
+//    def scannerHome = tool 'SonarScanner 4.0';
+        steps{
+        withSonarQubeEnv('sonnar') { 
+        // If you have configured more than one global server connection, you can specify its name
+//      sh "${scannerHome}/bin/sonar-scanner"
+        sh "mvn -f assignment/pom.xml sonar:sonar -Dsonar.organization=assignmentsonar -Dsonar.projectKey=assignmentsonar -Dsonar.host.url=https://sonarcloud.io -Dsonar.login=c10fa53c55634324bc563f0f16882a67e0e7aeb9"
+    }
+        }
+        }
+        stage('artifact'){
+            steps{
+                archiveArtifacts artifacts: '**/*.war', followSymlinks: false
+            }
+        }
+        stage('copy artifact'){
+            steps{
+                copyArtifacts filter: '**/*.war', fingerprintArtifacts: true, projectName: '${JOB_NAME}', selector: specific('${BUILD_NUMBER}')
+            }
+        }
+    }
+}
